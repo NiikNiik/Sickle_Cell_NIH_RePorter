@@ -1,6 +1,6 @@
 # Sickle_Cell_NIH_RePorter
 
-This repository explores NIH RePORTER awards related to the Cure Sickle Cell Initiative. The `Sickle_Cell_initiative.ipynb` notebook keeps the workflow beginner-friendly: it cleans the data and visualizes funding patterns without advanced machine learning.
+This repository explores NIH RePORTER awards related to the Cure Sickle Cell Initiative. The `Sickle_Cell_initiative.ipynb` notebook keeps the workflow beginner-friendly: it cleans the data, compares sickle cell vs. Cooley's anemia spending, and uses one simple text model for practice.
 
 ## Quick review
 
