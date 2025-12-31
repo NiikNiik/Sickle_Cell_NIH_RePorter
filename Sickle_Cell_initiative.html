@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sickle Cell Initiative Notebook (Preview)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; }
+    pre { background: #f7f7f7; padding: 12px; border-radius: 6px; overflow: auto; }
+    h1, h2, h3 { color: #15326b; }
+    code { background: #eef; }
+  </style>
+</head>
+<body>
+  <h1>Sickle_Cell_initiative.ipynb (text-only preview)</h1>
+  <p>This lightweight export lets you skim the notebook structure and descriptions without running any code.</p>
+
+  <h2>Purpose</h2>
+  <p>The notebook cleans NIH RePORTER data for sickle cell awards and visualizes funding patterns. It stays beginner-friendly—only Pandas and a few plotting libraries are used.</p>
+
+  <h2>Dependencies</h2>
+  <pre><code>import pandas as pd
+import numpy as np
+import os
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+plt.style.use('seaborn-v0_8')
+  </code></pre>
+
+  <h2>Data loading</h2>
+  <pre><code># point to the data file next to this notebook
+path = str(os.getcwd()).replace("Notebooks", "Data")
+
+df = pd.read_csv(path + '/SickleCell_Gene_Allyrs.csv', encoding='latin-1')
+  </code></pre>
+
+  <h2>Cleaning steps</h2>
+  <p>Dollar signs and commas are removed from cost columns so they can be summed numerically.</p>
+  <pre><code>cost_cols = ['Total Cost', 'Total Cost(Sub Projects)',
+             'Direct Cost IC', 'Indirect Cost IC', 'Total Cost IC']
+
+for c in cost_cols:
+    df[c] = (df[c]
+             .replace(r'[$,]', '', regex=True)
+             .replace(r'^\s*$', None, regex=True)
+             .astype(float))
+  </code></pre>
+
+  <h2>Sample exploration</h2>
+  <p>The notebook previews the first few rows, column names, shapes, and dtypes to understand the fields.</p>
+
+  <h2>Trends in funded projects</h2>
+  <p>A simple line chart shows how many unique projects are funded each fiscal year.</p>
+  <pre><code>yearly_counts = (df.groupby('Fiscal Year')['Project Number']
+                  .nunique()
+                  .reset_index()
+                  .sort_values('Fiscal Year'))
+
+plt.plot(yearly_counts['Fiscal Year'], yearly_counts['Project Number'], marker='o')
+plt.title('Number of Unique Projects by Fiscal Year')
+plt.xlabel('Fiscal Year')
+plt.ylabel('Number of Unique Projects')
+plt.grid(True)
+plt.show()
+  </code></pre>
+
+  <h2>Filtering to sickle cell projects</h2>
+  <p>Rows tagged with “Sickle Cell Disease” in the spending category column are selected for focused views.</p>
+
+  <h2>Results (visual highlights)</h2>
+  <h3>Top institutions by total funding</h3>
+  <pre><code>top_orgs = (df.groupby('Organization Name')['Total Cost']
+              .sum()
+              .sort_values(ascending=False)
+              .head(10)
+              .reset_index())
+  </code></pre>
+  <p><strong>Takeaway:</strong> Funding is concentrated among a handful of research centers.</p>
+
+  <h3>Funding by fiscal year</h3>
+  <pre><code>funding_by_year = (df.groupby('Fiscal Year')['Total Cost']
+                     .sum()
+                     .reset_index()
+                     .sort_values('Fiscal Year'))
+  </code></pre>
+  <p><strong>Takeaway:</strong> Support grows after 2015, with recent years showing the strongest totals.</p>
+
+  <h3>Spending category mix</h3>
+  <pre><code>category_counts = (df['NIH Spending Categorization']
+                     .value_counts()
+                     .reset_index()
+                     .rename(columns={'index': 'NIH Spending Categorization',
+                                       'NIH Spending Categorization': 'project_count'})
+                     .head(8))
+  </code></pre>
+  <p><strong>Takeaway:</strong> Most entries are explicitly tagged as sickle cell projects, followed by closely related clinical areas.</p>
+</body>
+</html>
