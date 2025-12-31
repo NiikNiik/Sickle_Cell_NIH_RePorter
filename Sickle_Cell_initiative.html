@@ -1,0 +1,265 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Sickle Cell Initiative Notebook (Preview)</title>
+<style>body{font-family:Arial, sans-serif; margin:40px;} pre{background:#f7f7f7;padding:12px;border-radius:6px;overflow:auto;} h1,h2,h3{color:#15326b;} code{background:#eef;} </style>
+</head><body>
+<h1>Sickle_Cell_initiative.ipynb (text-only export)</h1>
+<p>This lightweight HTML export mirrors the notebook structure so reviewers can skim narrative, code, and chart captions without executing the notebook. Run the notebook to reproduce figures.</p>
+<h1>NIH Sickle Cell Research Analysis</h1>
+<p>Welcome to this exploratory data science project focused on NIH-funded sickle cell research. This analysis aims to investigate how National Institutes of Health (NIH)&#x27;s NHLBI (National Heart Lung Blood Institute) allocates funding to sickle cell projects, with a particular focus on those aligned with the **Cure Sickle Cell Initiative**. Using publicly available data from NIH RePORTER, we examine:</p>
+<p>- The distribution of research funding across institutions, investigators, and geographic regions  </p>
+<p>- Trends in project focus areas (e.g., sickle cell disease, gene therapy, clinical trials)  </p>
+<p>- How individual projects align with the goals of NHLBI&#x27;s Cure Sickle Cell Initiative  </p>
+<p>The goal of this notebook is not only to extract and visualize relevant patterns in the data, but also to gain insight into how large-scale biomedical initiatives are financially supported. This work contributes to a deeper understanding of how public funding shapes the landscape of sickle cell disease research in the United States.</p>
+<p>**Tools Used**: Python (Pandas, Matplotlib, Seaborn, sklearn, numpy, os), Jupyter Notebook, NIH RePORTER CSV exports  </p>
+<h1>Dependencies</h1>
+<pre><code>
+# Install package for natural language processing (run once)
+%pip install nltk
+
+# data manipulation
+import pandas as pd
+import numpy as np
+import os
+
+# text analysis tools
+import nltk
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
+from sklearn.decomposition import LatentDirichletAllocation
+from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.metrics import classification_report, confusion_matrix
+from nltk.stem import SnowballStemmer
+import string
+
+# visualization tools
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# autosave every 60 seconds (optional)
+%autosave 60
+</code></pre>
+<h1>Set Paths</h1>
+<pre><code>
+# Convert scientific notation to a full float
+pd.set_option(&#x27;display.float_format&#x27;, &#x27;{:.2f}&#x27;.format)
+</code></pre>
+<pre><code>
+# Convert scientific notation to a full float
+pd.set_option(&#x27;display.float_format&#x27;, &#x27;{:.2f}&#x27;.format)
+</code></pre>
+<pre><code>
+# Set the path to the &quot;Data&quot; folder by replacing &quot;Notebooks&quot; in the current directory path
+path = str(os.getcwd()).replace(&quot;Notebooks&quot;, &quot;Data&quot;)
+
+# If the data has been moved, manually set the path below (not recommended for reproducibility)
+# path = &#x27;...&#x27;  # Uncomment and update if needed
+
+# Print the path to verify correctness (varies by computer)
+print(path)
+</code></pre>
+<h2>Background: The Cure Sickle Cell Initiative</h2>
+<p>The **Cure Sickle Cell Initiative (CureSCi)** began in 2018. It is a collaborative research effort launched by the National Heart, Lung, and Blood Institute (NHLBI) to accelerate the development of genetic-based cures for sickle cell disease (SCD). SCD is a hereditary blood disorder that disproportionately affects African American and other minority populations in the United States. Despite being recognized for over a century, curative treatments remain limited, and disparities in care and outcomes persist.</p>
+<p>CureSCi seeks to coordinate efforts across government, academia, and industry to develop safe, effective, and widely accessible genetic therapies. Its goals include:</p>
+<p>- Advancing **gene-editing and gene-therapy approaches** as potential cures  </p>
+<p>- Enhancing **data sharing** and **patient engagement** in the research process  </p>
+<p>- Supporting the **translation of laboratory discoveries into clinical applications**  </p>
+<p>The initiative emphasizes not only scientific innovation but also equitable access, stakeholder collaboration, and the long-term sustainability of curative treatments.</p>
+<p>---</p>
+<h2>Project Focus</h2>
+<p>In this notebook, I explore how NIH funding is being allocated to support projects aligned with the goals of the Cure Sickle Cell Initiative. Specifically, I am interested in:</p>
+<p>- **The extent to which funded projects align with the CureSCi mission**, including efforts to address health disparities and promote patient-centered research</p>
+<p>- **What types of projects** (e.g., clinical trials, gene therapy, implementation science) are being supported  </p>
+<p>- **How funding patterns vary** across time   </p>
+<p>This analysis uses data extracted from the NIH RePORTER system, offering a data-driven perspective on how federal investments are shaping the future of sickle cell research and potential cures.</p>
+<p>---</p>
+<p>**Reference**: [Cure Sickle Cell Initiative – NHLBI](https://www.nhlbi.nih.gov/science/cure-sickle-cell-initiative)</p>
+<pre><code>
+# read in a csv file of grants using pd.read_csv() function
+df = pd.read_csv(path + &#x27;/SickleCell_Gene_Allyrs.csv&#x27;, encoding=&#x27;latin-1&#x27;)
+</code></pre>
+<h2>Previewing the Dataset</h2>
+<p>To begin exploring the data, we’ll take a look at the first five rows using the `head()` function. This will give us a quick sense of the dataset’s structure and the types of information it contains.</p>
+<pre><code>
+# See first 5 rows with head() function
+df.head(5)
+</code></pre>
+<pre><code>
+df.columns
+</code></pre>
+<pre><code>
+df.shape
+</code></pre>
+<pre><code>
+df.dtypes
+</code></pre>
+<pre><code>
+# To check the total number of unique projects
+
+df[&quot;Project Number&quot;].nunique()
+</code></pre>
+<p>Remove dollar signs ($) from data inorder to convert data from strings to floats</p>
+<pre><code>
+cost_cols = [
+    &#x27;Total Cost&#x27;, &#x27;Total Cost(Sub Projects)&#x27;,
+    &#x27;Direct Cost IC&#x27;, &#x27;Indirect Cost IC&#x27;, &#x27;Total Cost IC&#x27;
+]
+
+for c in cost_cols:
+    df[c] = (
+        df[c]
+        .replace(r&#x27;[$,]&#x27;, &#x27;&#x27;, regex=True)   # remove $ and commas
+        .replace(r&#x27;^\s*$&#x27;, None, regex=True)  # convert blank strings to NaN
+        .astype(float)
+    )
+</code></pre>
+<h2>Trends in Funded Projects Over Time </h2>
+<p>To understand how NIH support for sickle cell research has evolved, we visualize the number of unique projects funded each fiscal year. This line graph shows trends in project counts over time, helping us identify periods of increased investment or shifts in research activity.</p>
+<pre><code>
+# Clean up column names
+df.columns = df.columns.str.strip()
+
+# Group by Fiscal Year and count unique Project Numbers
+yearly_counts = df.groupby(&quot;Fiscal Year&quot;)[&quot;Project Number&quot;].nunique().reset_index()
+
+# Sort by Fiscal Year
+yearly_counts = yearly_counts.sort_values(&quot;Fiscal Year&quot;)
+
+# Plot as a line graph
+plt.figure(figsize=(10, 6))
+plt.plot(yearly_counts[&quot;Fiscal Year&quot;], yearly_counts[&quot;Project Number&quot;], marker=&#x27;o&#x27;)
+plt.xlabel(&quot;Fiscal Year&quot;)
+plt.ylabel(&quot;Number of Unique Projects&quot;)
+plt.title(&quot;Number of Unique Projects by Fiscal Year&quot;)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+</code></pre>
+<p>The line graph shows a clear trend in the number of unique NIH-funded sickle cell research projects over time. Several observations stand out:</p>
+<p>- **2008–2014**: There is a noticeable **decline** in the number of projects, reaching a low point around 2013–2014. This may reflect broader funding constraints or shifts in NIH priorities during this period.</p>
+<p>- **2015 onward**: Beginning in 2015, there&#x27;s a **strong upward trend** in project counts, with a few fluctuations. The most dramatic growth appears between **2018 and 2023**, with the number of projects increasing each year.</p>
+<p>- **Post-2018 growth** aligns closely with the launch and expansion of the **Cure Sickle Cell Initiative**, suggesting that targeted efforts like CureSCi may have significantly contributed to renewed investment and interest in sickle cell research.</p>
+<p>- **2023** marks the highest number of unique projects in the dataset, reflecting a sustained and growing commitment to addressing sickle cell disease.</p>
+<p>Overall, this trend demonstrates that sickle cell research has gained increased momentum in recent years—an encouraging sign for efforts to accelerate cures and improve outcomes for patients.</p>
+<h2>Filtering for Sickle Cell-Focused Projects</h2>
+<p>The NIH dataset includes a wide range of projects spanning various diseases and research areas. To narrow our analysis to only those projects that are specifically related to sickle cell disease, we filter the dataset using the **`NIH Spending Categorization`** column.</p>
+<p>This column tags each project with relevant research categories. By selecting only rows where this column includes **&quot;Sickle Cell Disease&quot;**, we isolate the subset of projects that the NIH has officially categorized under this focus area. </p>
+<p>The filtered dataset, `Sickle_Cell_Disease_df`, will serve as the primary foundation for further analysis.</p>
+<pre><code>
+# Filter rows where &#x27;NIH Spending Categorization&#x27; equals &#x27;Sickle Cell Disease&#x27;
+Sickle_Cell_Disease_df = df[df[&quot;NIH Spending Categorization&quot;].str.contains(&quot;Sickle Cell Disease&quot;, na=False)]
+
+# Preview the result
+Sickle_Cell_Disease_df.head(5)
+</code></pre>
+<pre><code>
+# Group by Fiscal Year and count unique Project Numbers
+yearly_counts = Sickle_Cell_Disease_df.groupby(&quot;Fiscal Year&quot;)[&quot;Project Number&quot;].nunique().reset_index()
+
+# Sort by Fiscal Year
+yearly_counts = yearly_counts.sort_values(&quot;Fiscal Year&quot;)
+
+# Plot as a line graph
+plt.figure(figsize=(10, 6))
+plt.plot(yearly_counts[&quot;Fiscal Year&quot;], yearly_counts[&quot;Project Number&quot;], marker=&#x27;o&#x27;)
+plt.xlabel(&quot;Fiscal Year&quot;)
+plt.ylabel(&quot;Number of Unique Projects&quot;)
+plt.title(&quot;Number of Unique Sickle Cell Projects by Fiscal Year&quot;)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+</code></pre>
+<h1>Graph Number of Sickle Cell and Gene Therapy Projects By Start Date (Year)</h1>
+<h3>This is done since projects can span more than one fiscal year</h3>
+<pre><code>
+# Convert &#x27;Budget Start Date&#x27; to datetime format
+df[&quot;Budget Start Date&quot;] = pd.to_datetime(df[&quot;Budget Start Date&quot;], format=&quot;%m/%d/%y&quot;, errors=&#x27;coerce&#x27;)
+
+# Extract the year as a new column
+df[&quot;Budget Year&quot;] = df[&quot;Budget Start Date&quot;].dt.year
+
+# Group by year and count unique project numbers
+yearly_project_counts = df.groupby(&quot;Budget Year&quot;)[&quot;Project Number&quot;].nunique().reset_index()
+
+# Sort by year
+yearly_project_counts = yearly_project_counts.sort_values(&quot;Budget Year&quot;)
+
+# Plot the line graph
+plt.figure(figsize=(10, 6))
+plt.plot(yearly_project_counts[&quot;Budget Year&quot;], yearly_project_counts[&quot;Project Number&quot;], marker=&#x27;o&#x27;)
+plt.xlabel(&quot;Budget Year&quot;)
+plt.ylabel(&quot;Number of Unique Projects&quot;)
+plt.title(&quot;Unique Projects by Budget Start Year&quot;)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+</code></pre>
+<pre><code>
+# Convert &#x27;Budget Start Date&#x27; to datetime format
+Sickle_Cell_Disease_df[&quot;Budget Start Date&quot;] = pd.to_datetime(df[&quot;Budget Start Date&quot;], format=&quot;%m/%d/%y&quot;, errors=&#x27;coerce&#x27;)
+
+# Extract the year as a new column
+Sickle_Cell_Disease_df[&quot;Budget Year&quot;] = Sickle_Cell_Disease_df[&quot;Budget Start Date&quot;].dt.year
+
+# Group by year and count unique project numbers
+yearly_project_counts = Sickle_Cell_Disease_df.groupby(&quot;Budget Year&quot;)[&quot;Project Number&quot;].nunique().reset_index()
+
+# Sort by year
+yearly_project_counts = yearly_project_counts.sort_values(&quot;Budget Year&quot;)
+
+# Plot the line graph
+plt.figure(figsize=(10, 6))
+plt.plot(yearly_project_counts[&quot;Budget Year&quot;], yearly_project_counts[&quot;Project Number&quot;], marker=&#x27;o&#x27;)
+plt.xlabel(&quot;Budget Year&quot;)
+plt.ylabel(&quot;Number of Unique Projects&quot;)
+plt.title(&quot;Unique Projects by Sickle Cell Projects per Year&quot;)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+</code></pre>
+<h2>Assessing Project Alignment Using NLP</h2>
+<p>The previous sections examined NIH sickle cell funding through descriptive and exploratory analysis,</p>
+<p>including funding distributions, research focus areas, and alignment with the Cure Sickle Cell Initiative.</p>
+<p>To complement this analysis, we apply a simple natural language processing (NLP) approach to assess</p>
+<p>whether project descriptions contain sufficient signal to reproduce NIH spending categorizations.</p>
+<p>This serves as a validation step rather than a predictive objective.</p>
+<p>Filling &#x27;Project Title&#x27; and &#x27;Public Health Relevance&#x27; that have missing values with empty strings</p>
+<pre><code>
+df[&#x27;text&#x27;] = (
+    df[&#x27;Project Title&#x27;].fillna(&#x27;&#x27;) + &#x27; &#x27; +
+    df[&#x27;Public Health Relevance&#x27;].fillna(&#x27;&#x27;)
+).str.strip()
+
+</code></pre>
+<pre><code>
+from sklearn.model_selection import train_test_splitfrom sklearn.feature_extraction.text import TfidfVectorizerfrom sklearn.linear_model import LogisticRegressionfrom sklearn.metrics import accuracy_score, f1_score# Vectorize the combined title/abstract text and encode spending categoriesvectorizer = TfidfVectorizer(stop_words=&#x27;english&#x27;, max_features=5000, ngram_range=(1, 2))X = vectorizer.fit_transform(df[&#x27;text&#x27;])y = df[&#x27;NIH Spending Categorization&#x27;]# Split into train and test foldsX_train, X_test, y_train, y_test = train_test_split(    X, y, test_size=0.2, random_state=42, stratify=y)# Fit a simple linear classifierclf = LogisticRegression(max_iter=200, n_jobs=-1)clf.fit(X_train, y_train)# Generate predictionspreds = clf.predict(X_test)
+</code></pre>
+<pre><code>
+# Report standard text-classification metricsacc = accuracy_score(y_test, preds)f1 = f1_score(y_test, preds, average=&#x27;macro&#x27;)print(f&quot;Accuracy: {acc:.3f}&quot;)print(f&quot;Macro F1: {f1:.3f}&quot;)print(&quot;Detailed classification report (per spending category):&quot;)print(classification_report(y_test, preds))
+</code></pre>
+<pre><code>
+# Confusion matrix to see which spending categories are most confusablelabels = sorted(y.unique())cm = confusion_matrix(y_test, preds, labels=labels)plt.figure(figsize=(8, 6))sns.heatmap(cm, annot=True, fmt=&#x27;d&#x27;, cmap=&#x27;Blues&#x27;,            xticklabels=labels, yticklabels=labels)plt.title(&#x27;Confusion Matrix: NIH Spending Categorization Classifier&#x27;)plt.ylabel(&#x27;True Label&#x27;)plt.xlabel(&#x27;Predicted Label&#x27;)plt.tight_layout()plt.show()
+</code></pre>
+<pre><code>
+from sklearn.cluster import KMeans# Topic clustering using TF-IDF featurescluster_vectorizer = TfidfVectorizer(stop_words=&#x27;english&#x27;, max_df=0.75, min_df=5)cluster_matrix = cluster_vectorizer.fit_transform(df[&#x27;text&#x27;])k = 5  # modest number of thematic clusterskmeans = KMeans(n_clusters=k, random_state=42, n_init=&#x27;auto&#x27;)df[&#x27;topic_cluster&#x27;] = kmeans.fit_predict(cluster_matrix)# Inspect top keywords per clusterterms = cluster_vectorizer.get_feature_names_out()top_n = 8for idx in range(k):    cluster_terms = kmeans.cluster_centers_[idx].argsort()[::-1][:top_n]    keywords = &#x27;, &#x27;.join(terms[i] for i in cluster_terms)    print(f&quot;Cluster {idx}: {keywords}&quot;)
+</code></pre>
+<pre><code>
+# Visualize cluster prevalencecluster_counts = df[&#x27;topic_cluster&#x27;].value_counts().sort_index()plt.figure(figsize=(8, 5))sns.barplot(x=cluster_counts.index, y=cluster_counts.values, color=&#x27;mediumpurple&#x27;)plt.title(&#x27;Topic Cluster Counts from Project Text&#x27;)plt.xlabel(&#x27;Cluster Label&#x27;)plt.ylabel(&#x27;Number of Projects&#x27;)plt.tight_layout()plt.show()
+</code></pre>
+<h1>ResultsThe following visuals and model diagnostics summarize the most decision-relevant findings from the NIH sickle cell dataset.Each figure is accompanied by short takeaways so reviewers can quickly understand the funding and text-mining patterns.</h1>
+<h3>Funding concentration by institutionThe stacked bar chart below highlights which institutions capture the largest share of sickle cell project funding.It aggregates the **Total Cost** across awards and displays the top recipients.</h3>
+<pre><code>
+top_orgs = (    df.groupby(&#x27;Organization Name&#x27;)[&#x27;Total Cost&#x27;]      .sum()      .sort_values(ascending=False)      .head(10)      .reset_index())plt.figure(figsize=(10, 6))sns.barplot(data=top_orgs, x=&#x27;Total Cost&#x27;, y=&#x27;Organization Name&#x27;, palette=&#x27;Blues_d&#x27;)plt.title(&#x27;Top 10 Institutions by Total NIH Sickle Cell Funding&#x27;)plt.xlabel(&#x27;Total Cost (USD)&#x27;)plt.ylabel(&#x27;Institution&#x27;)plt.tight_layout()plt.show()
+</code></pre>
+<p>**Takeaway:** Funding is concentrated among a handful of academic medical centers and research institutes, suggestingthat collaborations with these hubs may accelerate progress on Cure Sickle Cell priorities.</p>
+<h3>Topic clusters from project abstractsUsing TF-IDF vectors and k-means clustering, we extract dominant themes from titles and public health relevance sections.The bar plot shows how many awards fall into each cluster; the printed keywords help interpret the themes.</h3>
+<pre><code>
+# Reuse the previously computed topic clusterscluster_summary = (    df.groupby(&#x27;topic_cluster&#x27;)[&#x27;Total Cost&#x27;]      .agg([&#x27;count&#x27;, &#x27;sum&#x27;])      .rename(columns={&#x27;count&#x27;: &#x27;project_count&#x27;, &#x27;sum&#x27;: &#x27;total_cost&#x27;})      .reset_index())plt.figure(figsize=(9, 5))sns.barplot(data=cluster_summary, x=&#x27;topic_cluster&#x27;, y=&#x27;project_count&#x27;, color=&#x27;teal&#x27;)plt.title(&#x27;Project Volume per Topic Cluster&#x27;)plt.xlabel(&#x27;Topic Cluster&#x27;)plt.ylabel(&#x27;Number of Projects&#x27;)plt.tight_layout()plt.show()cluster_summary
+</code></pre>
+<p>**Takeaway:** Clusters typically map to gene therapy, clinical trials, hematology complications, and implementationresearch. This reinforces that NIH support spans both translational and clinical domains.</p>
+<h3>NLP classifier performance on spending categoriesThe logistic regression model predicts the NIH spending categorization from text fields. Accuracy and macro F1 arereported, and the confusion matrix highlights where the model struggles.</h3>
+<p>**Takeaway:** Solid accuracy and F1 suggest the NIH spending labels are reasonably learnable from free text. Misclassifi-cations tend to occur between closely related categories (e.g., overlapping clinical topics), signaling where futurecuration or additional text fields could sharpen the signal.</p>
+</body></html>
